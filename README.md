@@ -1,0 +1,1 @@
+Inspired by https://x.com/aemkei/status/1795762928399880680 and https://gist.github.com/rexim/f582098611b2be202051ba543e21da05

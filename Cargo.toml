@@ -1,0 +1,11 @@
+[package]
+name = "qclock_rs"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[[bin]]
+name = "qclock_rs"
+path = "src/main.rs"
+
+[dependencies]
