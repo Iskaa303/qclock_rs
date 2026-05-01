@@ -1,5 +1,4 @@
 # qclock_rs
----
 
 Toolset for reproducing Quine Clock in Rust: https://gist.github.com/Iskaa303/49fa2ed027e4c99b4dcd244b88a52f9f
 
@@ -27,9 +26,9 @@ $ ./qclock.exe
 
 # Usage
 
-``` ./qclock -b ``` to make it bounce like that DVD logo
-``` ./qclock hh:mm:ss ``` to set a timer
+``` ./qclock -b ``` to make it bounce like that DVD logo  
+``` ./qclock hh:mm:ss ``` to set a timer  
 
-Press ``` q ``` to quit the program
-Press ``` space ``` to pause the program
-Press ``` s ``` to stop the bouncing
+Press ``` q ``` to quit the program  
+Press ``` space ``` to pause the program  
+Press ``` s ``` to stop the bouncing  
