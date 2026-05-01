@@ -24,12 +24,15 @@ fn main() {
         .replace("r###\"", S)
         .replace("\"###", E);
 
-    let surrogate_body = protected.replace("###", "#");
+    let surrogate_body = protected
+        .replace("###", "#");
+
+    let body_with_backticks = surrogate_body.replace("#[", "`");
 
     let injected = surrogate_body
         .replace(
             &format!("{}?{}", S, E),
-            &format!("r###\"pub fn main() {{ {} }}\"###", surrogate_body))
+            &format!("r###\"pub fn main() {{ {} }}\"###", body_with_backticks))
         .replace(S, "r#\"")
         .replace(E, "\"#");
 
