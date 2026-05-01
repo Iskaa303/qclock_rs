@@ -2,40 +2,42 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    const S: &str = "_S_";
+    const E: &str = "_E_";
+
     let src = Path::new("src/main.rs");
     let dest = Path::new("src/output.rs");
 
-    let content = fs::read_to_string(src).expect("Unable to read file");
+    let content = fs::read_to_string(src).expect("Read error");
 
     let start_k = "fn logic() {";
     let start_i = content.find(start_k).expect("Keyword not found") + start_k.len();
     let end_i = content.rfind("}").expect("Closing brace not found");
     let body = content[start_i..end_i].trim();
 
-    let body = body
-        .replace("    ", " ")
-        .replace("  ", " ")
-        .replace('\n', "")
-        .replace('\r', "")
-        .replace('\t', "");
+    let flattened = body
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
 
-    let escaped = body
-        .replace('\\', "\\\\")
-        .replace('\"', "\\\"");
+    let protected = flattened
+        .replace("r###\"", S)
+        .replace("\"###", E);
 
-    let escaped = format!(
-        "/* GENERATED FILE - DO NOT EDIT */ fn main() {{{}}}",
-        escaped
-    );
+    let surrogate_body = protected.replace("###", "#");
 
-    let final_code = body.replace("?", &escaped);
+    let injected = surrogate_body
+        .replace(
+            &format!("{}?{}", S, E),
+            &format!("r###\"pub fn main() {{ {} }}\"###", surrogate_body))
+        .replace(S, "r#\"")
+        .replace(E, "\"#");
 
     let output_content = format!(
-        "/* GENERATED FILE - DO NOT EDIT */ pub fn main() {{{}}}",
-        final_code
+        "pub fn main() {{ {} }}",
+        injected
     );
 
-    let output_content = output_content.replace("?", &escaped);
-
-    fs::write(dest, output_content).expect("Could not write output.rs");
+    fs::write(dest, output_content).expect("Write error");
+    println!("cargo:rerun-if-changed=src/main.rs");
 }
