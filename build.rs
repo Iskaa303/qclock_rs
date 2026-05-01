@@ -32,12 +32,12 @@ fn main() {
     let injected = surrogate_body
         .replace(
             &format!("{}?{}", S, E),
-            &format!("r###\"pub fn main() {{ {} }}\"###", body_with_backticks))
+            &format!("r###\"/* rustc qclock.rs -o qclock && ./qclock [-b] [hh:mm:ss]; Iskaa303 (2026) GNU GPLv3 */ pub fn main() {{ {} }}\"###", body_with_backticks))
         .replace(S, "r#\"")
         .replace(E, "\"#");
 
     let output_content = format!(
-        "pub fn main() {{ {} }}",
+        "/* rustc qclock.rs -o qclock && ./qclock [-b] [hh:mm:ss]; Iskaa303 (2026) GNU GPLv3 */ pub fn main() {{ {} }}",
         injected
     );
 

@@ -84,10 +84,10 @@ fn logic() {
         }
     }
 
-    const W: usize = 255;
+    const W: usize = 287;
     const H: usize = 67;
-    const SCALE_X: usize = 3; 
-    const SCALE_Y: usize = 3;
+    const SCALE_X: usize = 2; 
+    const SCALE_Y: usize = 2;
     const CHAR_GAP: usize = 2;
     const HOUR_OFFSET: i64 = -4; 
 
@@ -108,9 +108,23 @@ fn logic() {
 
     let mut is_timer = false;
     let mut duration_secs: i64 = 0;
+    let mut bounce_mode = false;
     let args: Vec<String> = env::args().collect();
+
     if args.len() > 1 {
-        let target = if args[1].contains(':') { &args[1] } else if args.len() > 2 { &args[2] } else { "" };
+        let mut target = "";
+        for (idx, arg) in args.iter().enumerate().skip(1) {
+            if arg == "-b" {
+                bounce_mode = true;
+            } else if arg == "-t" {
+                if let Some(val) = args.get(idx + 1) {
+                    target = val;
+                }
+            } else if arg.contains(':') && target == "" {
+                target = arg;
+            }
+        }
+        
         let parts: Vec<&str> = target.split(':').collect();
         if parts.len() == 3 {
             is_timer = true;
@@ -182,10 +196,16 @@ fn logic() {
     });
 
     let mut paused = false;
+    let mut bounce_stopped = false;
     let mut last_display_time = String::new();
     let mut pause_start = Instant::now();
     let mut total_paused_nanos = 0u128;
     let start_instant = Instant::now();
+
+    let mut b_x: f64 = 0.0;
+    let mut b_y: f64 = 0.0;
+    let mut b_dx: f64 = 1.0;
+    let mut b_dy: f64 = 1.0;
 
     print!("\x1b[{}25l\x1b[2J", QUESTION);
     loop {
@@ -203,6 +223,9 @@ fn logic() {
                     } else {
                         total_paused_nanos += pause_start.elapsed().as_nanos();
                     }
+                }
+                b's' => {
+                    bounce_stopped = !bounce_stopped;
                 }
                 _ => {}
             }
@@ -236,8 +259,33 @@ fn logic() {
         let scaled_g_w = g_w * SCALE_X;
         let scaled_g_h = g_h * SCALE_Y;
         let clock_w = (time_str.len() * scaled_g_w) + (time_str.len() - 1) * CHAR_GAP;
-        let start_x = (W.saturating_sub(clock_w)) / 2;
-        let start_y = (H.saturating_sub(scaled_g_h)) / 2;
+        
+        let start_x: usize;
+        let start_y: usize;
+
+        if bounce_mode && !paused && !bounce_stopped {
+            let max_x = W.saturating_sub(clock_w) as f64;
+            let max_y = H.saturating_sub(scaled_g_h) as f64;
+            
+            if max_x > 0.0 {
+                b_x += b_dx;
+                if b_x >= max_x { b_x = max_x; b_dx = -1.0; }
+                if b_x <= 0.0 { b_x = 0.0; b_dx = 1.0; }
+            }
+            if max_y > 0.0 {
+                b_y += b_dy;
+                if b_y >= max_y { b_y = max_y; b_dy = -1.0; }
+                if b_y <= 0.0 { b_y = 0.0; b_dy = 1.0; }
+            }
+            start_x = b_x as usize;
+            start_y = b_y as usize;
+        } else if bounce_mode && (paused || bounce_stopped) {
+            start_x = b_x as usize;
+            start_y = b_y as usize;
+        } else {
+            start_x = (W.saturating_sub(clock_w)) / 2;
+            start_y = (H.saturating_sub(scaled_g_h)) / 2;
+        }
 
         let mut canvas = vec![vec![false; W]; H];
         for (idx, c) in time_str.chars().enumerate() {
@@ -265,7 +313,9 @@ fn logic() {
         let flash_visible = (active_elapsed_nanos / 1_000_000_000) % 2 == 0;
         let color_code = if is_finished {
              if flash_visible { "1;32" } else { "38;5;236" }
-        } else if paused { "1;33" } else { "1;31" };
+        } else if paused { "1;33" } 
+        else if bounce_stopped { "1;34" }
+        else { "1;31" };
 
         for row in 0..H {
             let line_tokens = &lines[row];
