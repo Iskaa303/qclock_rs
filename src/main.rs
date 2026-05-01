@@ -84,8 +84,8 @@ fn logic() {
         }
     }
 
-    const W: usize = 250;
-    const H: usize = 66;
+    const W: usize = 255;
+    const H: usize = 67;
     const SCALE_X: usize = 3; 
     const SCALE_Y: usize = 3;
     const CHAR_GAP: usize = 2;
@@ -208,11 +208,18 @@ fn logic() {
             }
         }
 
+        let mut is_finished = false;
+        let active_elapsed_nanos = if paused {
+             start_instant.elapsed().as_nanos() - total_paused_nanos - pause_start.elapsed().as_nanos()
+        } else {
+             start_instant.elapsed().as_nanos() - total_paused_nanos
+        };
+
         let time_str = if paused {
             last_display_time.clone()
         } else if is_timer {
-            let active_elapsed = start_instant.elapsed().as_nanos() - total_paused_nanos;
-            let remaining = (duration_secs - (active_elapsed / 1_000_000_000) as i64).max(0);
+            let remaining = (duration_secs - (active_elapsed_nanos / 1_000_000_000) as i64).max(0);
+            if remaining == 0 { is_finished = true; }
             format!("{:02}:{:02}:{:02}", remaining / 3600, (remaining / 60) % 60, remaining % 60)
         } else {
             let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
@@ -254,7 +261,11 @@ fn logic() {
 
         let mut frame = String::with_capacity(W * H * 15);
         frame.push_str("\x1b[H"); 
-        let color_code = if paused { "1;33" } else { "1;31" };
+        
+        let flash_visible = (active_elapsed_nanos / 1_000_000_000) % 2 == 0;
+        let color_code = if is_finished {
+             if flash_visible { "1;32" } else { "38;5;236" }
+        } else if paused { "1;33" } else { "1;31" };
 
         for row in 0..H {
             let line_tokens = &lines[row];
@@ -284,7 +295,11 @@ fn logic() {
 
             for (col, &c) in line_chars.iter().enumerate().take(W) {
                 if canvas[row][col] && c != SPACE {
-                    frame.push_str(&format!("\x1b[{}m", color_code));
+                    if is_finished && !flash_visible {
+                        frame.push_str("\x1b[38;5;236m");
+                    } else {
+                        frame.push_str(&format!("\x1b[{}m", color_code));
+                    }
                     frame.push(c);
                     frame.push_str("\x1b[0m");
                 } else {
