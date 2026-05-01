@@ -7,10 +7,17 @@ fn main() {
 #[allow(dead_code)]
 fn logic() {
     use std::time::{SystemTime, UNIX_EPOCH};
-    use std::io::{self, Write};
+    use std::io::{self, Write, Read};
+    use std::sync::mpsc;
+    use std::thread;
 
     const W: usize = 200;
-    const H: usize = 42;
+    const H: usize = 49;
+
+    const SCALE_X: usize = 2; 
+    const SCALE_Y: usize = 2;
+    const CHAR_GAP: usize = 2;
+    const HOUR_OFFSET: i64 = -4; 
 
     const HASH: char = 35 as char;
     const SPACE: char = 32 as char;
@@ -75,19 +82,38 @@ fn logic() {
         }
     }
 
-    print!("\x1b[2J");
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let mut buffer = [0; 1];
+        while io::stdin().read_exact(&mut buffer).is_ok() {
+            if buffer[0] == b'q' {
+                let _ = tx.send(());
+                break;
+            }
+        }
+    });
+
+    print!("\x1b[2J\x1b[{}25l", QUESTION);
     loop {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let h_time = (now / 3600 % 24) as usize;
-        let m_time = (now / 60 % 60) as usize;
-        let s_time = (now % 60) as usize;
+        if rx.try_recv().is_ok() {
+            print!("\x1b[{}25h\x1b[2J\x1b[H", QUESTION);
+            break;
+        }
+
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
+        let local_now = now + (HOUR_OFFSET * 3600);
+        let h_time = (local_now / 3600 % 24).abs() as usize;
+        let m_time = (local_now / 60 % 60).abs() as usize;
+        let s_time = (local_now % 60).abs() as usize;
         let time_str = format!("{:02}:{:02}:{:02}", h_time, m_time, s_time);
 
         let g_w = 8;
         let g_h = 10;
-        let clock_w = time_str.len() * g_w;
+        let scaled_g_w = g_w * SCALE_X;
+        let scaled_g_h = g_h * SCALE_Y;
+        let clock_w = (time_str.len() * scaled_g_w) + (time_str.len() - 1) * CHAR_GAP;
         let start_x = (W.saturating_sub(clock_w)) / 2;
-        let start_y = (H.saturating_sub(g_h)) / 2;
+        let start_y = (H.saturating_sub(scaled_g_h)) / 2;
 
         let mut canvas = vec![vec![false; W]; H];
         for (idx, c) in time_str.chars().enumerate() {
@@ -96,9 +122,13 @@ fn logic() {
                     for px in 0..g_w {
                         let bit_pos = (g_h - 1 - py) * g_w + (g_w - 1 - px);
                         if (bits >> bit_pos) & 1 == 1 {
-                            let x = start_x + idx * g_w + px;
-                            let y = start_y + py;
-                            if x < W && y < H { canvas[y][x] = true; }
+                            for sy in 0..SCALE_Y {
+                                for sx in 0..SCALE_X {
+                                    let x = start_x + idx * (scaled_g_w + CHAR_GAP) + (px * SCALE_X) + sx;
+                                    let y = start_y + (py * SCALE_Y) + sy;
+                                    if x < W && y < H { canvas[y][x] = true; }
+                                }
+                            }
                         }
                     }
                 }
@@ -148,6 +178,6 @@ fn logic() {
         }
         print!("{}", frame);
         io::stdout().flush().unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        thread::sleep(std::time::Duration::from_millis(200));
     }
 }
